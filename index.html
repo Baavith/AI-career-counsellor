@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Career Counsellor</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* Simple loading spinner CSS */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- React and ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX transformation in browser (for development only) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        // Ensure React is available here. If not, the previous script block failed.
+        if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+            console.error("React or ReactDOM is undefined when Babel script starts. Check CDN loading order.");
+            document.getElementById('root').innerHTML = '<div style="text-align: center; padding: 20px; color: red; font-family: sans-serif;">Error: Failed to load application. Please check your internet connection and try again.</div>';
+            throw new Error("React or ReactDOM not loaded."); // Stop script execution
+        }
+
+        const { useState, useEffect } = React;
+
+        // Main App component
+        const App = () => {
+            // State to manage current page view
+            const [currentPage, setCurrentPage] = useState('register'); // 'register', 'login', 'assessment', 'recommendations'
+            const [userId, setUserId] = useState(localStorage.getItem('userId')); // Stores the logged-in user's ID
+            const [message, setMessage] = useState(''); // General message for success/error
+            const [isLoading, setIsLoading] = useState(false); // Loading indicator
+
+            // Base URL for the backend API (change if your Flask app is hosted elsewhere)
+            const API_BASE_URL = 'http://localhost:5000'; // Make sure your Flask backend is running on this address!
+
+            // Update localStorage when userId changes
+            useEffect(() => {
+                if (userId) {
+                    localStorage.setItem('userId', userId);
+                    // If user is logged in, automatically go to assessment or recommendations
+                    if (currentPage === 'register' || currentPage === 'login') {
+                        console.log("App: User logged in, setting page to assessment.");
+                        setCurrentPage('assessment');
+                    }
+                } else {
+                    localStorage.removeItem('userId');
+                    console.log("App: User logged out, setting page to login.");
+                    setCurrentPage('login'); // Redirect to login if logged out
+                }
+            }, [userId]);
+
+            // Log currentPage changes
+            useEffect(() => {
+                console.log(`App: currentPage changed to: ${currentPage}`);
+            }, [currentPage]);
+
+
+            // Function to handle showing messages
+            const showMessage = (text, type = 'info') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(''), 5000); // Clear message after 5 seconds
+            };
+
+            // Basic email validation regex
+            const isValidEmail = (email) => {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            };
+
+            // --- Component for Register Page ---
+            const RegisterPage = () => {
+                const [email, setEmail] = useState('');
+                const [password, setPassword] = useState('');
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    setMessage('');
+
+                    if (!email || !password) {
+                        showMessage('Email and password are required.', 'error');
+                        setIsLoading(false);
+                        return;
+                    }
+                    if (!isValidEmail(email)) {
+                        showMessage('Please enter a valid email address.', 'error');
+                        setIsLoading(false);
+                        return;
+                    }
+                    if (password.length < 6) {
+                        showMessage('Password must be at least 6 characters long.', 'error');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/register`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password }),
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            showMessage(data.message, 'success');
+                            console.log("RegisterPage: Registration successful, attempting to set page to login.");
+                            setCurrentPage('login'); // Navigate to login after successful registration
+                        } else {
+                            showMessage(data.error || 'Registration failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Registration API error:', error);
+                        showMessage('Network error. Could not connect to backend.', 'error');
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                        <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+                            <h2 className="text-3xl font-extrabold text-center text-gray-900 mb-6">Register</h2>
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div>
+                                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email address</label>
+                                    <input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        placeholder="you@example.com"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
+                                    <input
+                                        id="password"
+                                        name="password"
+                                        type="password"
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        placeholder="********"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? <div className="loader mr-2"></div> : null}
+                                    {isLoading ? 'Registering...' : 'Register'}
+                                </button>
+                            </form>
+                            <p className="mt-6 text-center text-sm text-gray-600">
+                                Already have an account?{' '}
+                                <button onClick={() => { console.log("RegisterPage: 'Login here' button clicked, setting page to login."); setCurrentPage('login'); }} className="font-medium text-blue-600 hover:text-blue-500">
+                                    Login here
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Component for Login Page ---
+            const LoginPage = () => {
+                const [email, setEmail] = useState('');
+                const [password, setPassword] = useState('');
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    setMessage('');
+                    console.log("LoginPage: Attempting to log in with email:", email); // Log email being sent
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password }),
+                        });
+                        console.log("LoginPage: Raw API response object:", response); // Log the full response object
+                        const data = await response.json();
+                        console.log("LoginPage: Parsed API response data:", data); // Log the parsed JSON data
+                        if (response.ok) {
+                            showMessage(data.message, 'success');
+                            setUserId(data.user_id); // Store user ID
+                            console.log("LoginPage: Login successful, attempting to set page to assessment.");
+                            setCurrentPage('assessment'); // Navigate to assessment page
+                        } else {
+                            showMessage(data.error || 'Login failed', 'error');
+                            console.error("LoginPage: Login failed with message:", data.error || 'Unknown error');
+                        }
+                    } catch (error) {
+                        console.error('LoginPage: Login API error:', error);
+                        showMessage('Network error. Could not connect to backend. Is it running?', 'error');
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                        <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+                            <h2 className="text-3xl font-extrabold text-center text-gray-900 mb-6">Login</h2>
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div>
+                                    <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">Email address</label>
+                                    <input
+                                        id="login-email"
+                                        name="email"
+                                        type="email"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        placeholder="you@example.com"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">Password</label>
+                                    <input
+                                        id="login-password"
+                                        name="password"
+                                        type="password"
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        placeholder="********"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? <div className="loader mr-2"></div> : null}
+                                    {isLoading ? 'Logging In...' : 'Login'}
+                                </button>
+                            </form>
+                            <p className="mt-6 text-center text-sm text-gray-600">
+                                Don't have an account?{' '}
+                                <button onClick={() => { console.log("LoginPage: 'Register now' button clicked, setting page to register."); setCurrentPage('register'); }} className="font-medium text-green-600 hover:text-green-500">
+                                    Register now
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Component for Assessment Page ---
+            const AssessmentPage = () => {
+                // Initialize answers with all 6 questions
+                const [answers, setAnswers] = useState({ q1: '', q2: '', q3: '', q4: '', q5: '', q6: '' });
+
+                const handleAnswerChange = (questionId, value) => {
+                    setAnswers((prev) => ({ ...prev, [questionId]: value }));
+                };
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    setMessage('');
+                    if (!userId) {
+                        showMessage('User not logged in. Please log in.', 'error');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    // Client-side validation for all 6 questions
+                    const requiredQuestions = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'];
+                    if (requiredQuestions.some(q => !answers[q])) {
+                        showMessage('Please answer all assessment questions.', 'error');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/submit-assessment`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: userId, answers }),
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            showMessage(data.message, 'success');
+                            console.log("AssessmentPage: Assessment submitted, attempting to set page to recommendations.");
+                            setCurrentPage('recommendations'); // Navigate to recommendations
+                        } else {
+                            showMessage(data.error || 'Assessment submission failed', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Assessment API error:', error);
+                        showMessage('Network error. Could not connect to backend.', 'error');
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                        <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                            <h2 className="text-3xl font-extrabold text-center text-gray-900 mb-6">Career Assessment</h2>
+                            <p className="text-center text-gray-600 mb-8">Please answer a few questions to help us understand your interests.</p>
+                            
+                            <form onSubmit={handleSubmit} className="space-y-8">
+                                {/* Question 1 */}
+                                <div>
+                                    <label className="block text-lg font-medium text-gray-800 mb-2">
+                                        Q1: What subjects do you enjoy most in school?
+                                    </label>
+                                    <div className="space-y-2">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="q1"
+                                                value="Science"
+                                                checked={answers.q1 === 'Science'}
+                                                onChange={() => handleAnswerChange('q1', 'Science')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Science (Physics, Chemistry, Biology)</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q1"
+                                                value="Math"
+                                                checked={answers.q1 === 'Math'}
+                                                onChange={() => handleAnswerChange('q1', 'Math')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Mathematics</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q1"
+                                                value="Arts"
+                                                checked={answers.q1 === 'Arts'}
+                                                onChange={() => handleAnswerChange('q1', 'Arts')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Arts & Humanities (History, Literature)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Question 2 */}
+                                <div>
+                                    <label className="block text-lg font-medium text-gray-800 mb-2">
+                                        Q2: What kind of activities do you prefer in your free time?
+                                    </label>
+                                    <div className="space-y-2">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="q2"
+                                                value="Problem Solving"
+                                                checked={answers.q2 === 'Problem Solving'}
+                                                onChange={() => handleAnswerChange('q2', 'Problem Solving')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Solving complex puzzles or coding</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q2"
+                                                value="Creative"
+                                                checked={answers.q2 === 'Creative'}
+                                                onChange={() => handleAnswerChange('q2', 'Creative')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Creative arts (drawing, writing, music)</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q2"
+                                                value="Social"
+                                                checked={answers.q2 === 'Social'}
+                                                onChange={() => handleAnswerChange('q2', 'Social')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Volunteering or interacting with people</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Question 3 */}
+                                <div>
+                                    <label className="block text-lg font-medium text-gray-800 mb-2">
+                                        Q3: What is your ideal work environment?
+                                    </label>
+                                    <div className="space-y-2">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="q3"
+                                                value="Independent"
+                                                checked={answers.q3 === 'Independent'}
+                                                onChange={() => handleAnswerChange('q3', 'Independent')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Working independently on detailed tasks</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q3"
+                                                value="Collaborative"
+                                                checked={answers.q3 === 'Collaborative'}
+                                                onChange={() => handleAnswerChange('q3', 'Collaborative')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Collaborating in a team-oriented setting</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q3"
+                                                value="Dynamic"
+                                                checked={answers.q3 === 'Dynamic'}
+                                                onChange={() => handleAnswerChange('q3', 'Dynamic')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Dynamic, fast-paced environment with variety</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* NEW Question 4 */}
+                                <div>
+                                    <label className="block text-lg font-medium text-gray-800 mb-2">
+                                        Q4: Do you enjoy solving complex problems and challenges?
+                                    </label>
+                                    <div className="space-y-2">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="q4"
+                                                value="Yes"
+                                                checked={answers.q4 === 'Yes'}
+                                                onChange={() => handleAnswerChange('q4', 'Yes')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Yes, I love a good challenge!</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q4"
+                                                value="No"
+                                                checked={answers.q4 === 'No'}
+                                                onChange={() => handleAnswerChange('q4', 'No')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Not particularly, I prefer straightforward tasks.</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* NEW Question 5 */}
+                                <div>
+                                    <label className="block text-lg font-medium text-gray-800 mb-2">
+                                        Q5: How do you prefer to learn new skills or information?
+                                    </label>
+                                    <div className="space-y-2">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="q5"
+                                                value="Hands-on"
+                                                checked={answers.q5 === 'Hands-on'}
+                                                onChange={() => handleAnswerChange('q5', 'Hands-on')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">By doing and experimenting (hands-on).</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q5"
+                                                value="Structured"
+                                                checked={answers.q5 === 'Structured'}
+                                                onChange={() => handleAnswerChange('q5', 'Structured')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Through structured courses, reading, or lectures.</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* NEW Question 6 */}
+                                <div>
+                                    <label className="block text-lg font-medium text-gray-800 mb-2">
+                                        Q6: What kind of impact do you aspire to make in your career?
+                                    </label>
+                                    <div className="space-y-2">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="q6"
+                                                value="Innovate and create new technologies"
+                                                checked={answers.q6 === 'Innovate and create new technologies'}
+                                                onChange={() => handleAnswerChange('q6', 'Innovate and create new technologies')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Innovate and create new technologies.</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q6"
+                                                value="Help people and improve communities"
+                                                checked={answers.q6 === 'Help people and improve communities'}
+                                                onChange={() => handleAnswerChange('q6', 'Help people and improve communities')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Help people and improve communities.</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q6"
+                                                value="Analyze data and solve complex problems"
+                                                checked={answers.q6 === 'Analyze data and solve complex problems'}
+                                                onChange={() => handleAnswerChange('q6', 'Analyze data and solve complex problems')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Analyze data and solve complex problems.</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q6"
+                                                value="Express creativity and design"
+                                                checked={answers.q6 === 'Express creativity and design'}
+                                                onChange={() => handleAnswerChange('q6', 'Express creativity and design')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Express creativity and design.</span>
+                                        </label>
+                                        <label className="inline-flex items-center ml-4">
+                                            <input
+                                                type="radio"
+                                                name="q6"
+                                                value="Lead and manage projects/teams"
+                                                checked={answers.q6 === 'Lead and manage projects/teams'}
+                                                onChange={() => handleAnswerChange('q6', 'Lead and manage projects/teams')}
+                                                className="form-radio text-blue-600 h-5 w-5"
+                                            />
+                                            <span className="ml-2 text-gray-700">Lead and manage projects/teams.</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-150 ease-in-out"
+                                    disabled={isLoading || Object.values(answers).some(ans => ans === '')} // Disable if any answer is empty
+                                >
+                                    {isLoading ? <div className="loader mr-2"></div> : null}
+                                    {isLoading ? 'Submitting...' : 'Submit Assessment'}
+                                </button>
+                            </form>
+                            <div className="mt-6 text-center">
+                                <button onClick={() => setCurrentPage('recommendations')} className="text-purple-600 hover:underline">
+                                    Skip to Recommendations (for testing)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Component for Recommendations Page ---
+            const RecommendationsPage = () => {
+                const [recommendations, setRecommendations] = useState([]);
+
+                // Log recommendations state whenever it changes
+                useEffect(() => {
+                    console.log("RecommendationsPage: Current recommendations state:", recommendations);
+                }, [recommendations]);
+
+                useEffect(() => {
+                    const fetchRecommendations = async () => {
+                        setIsLoading(true);
+                        setMessage('');
+                        
+                        try {
+                            const currentUserId = userId || 'guest';
+                            console.log(`RecommendationsPage: Fetching recommendations for user_id: ${currentUserId}`);
+                            const response = await fetch(`${API_BASE_URL}/recommend-career?user_id=${currentUserId}`);
+                            const data = await response.json();
+                            console.log("RecommendationsPage: Raw API response data:", data); // Log raw data
+                            if (response.ok) {
+                                if (data && Array.isArray(data.recommendations)) {
+                                    setRecommendations(data.recommendations);
+                                    showMessage('Recommendations loaded.', 'success');
+                                    console.log("RecommendationsPage: Recommendations loaded successfully:", data.recommendations);
+                                    // Log the first recommendation object's full content for detailed inspection
+                                    if (data.recommendations.length > 0) {
+                                        console.log("RecommendationsPage: First recommendation object (full content):", data.recommendations[0]);
+                                    }
+                                } else {
+                                    showMessage('Recommendations data format invalid.', 'error');
+                                    console.error("RecommendationsPage: Invalid recommendations data format:", data);
+                                }
+                            } else {
+                                showMessage(data.error || 'Failed to fetch recommendations', 'error');
+                                console.error("RecommendationsPage: Failed to fetch recommendations:", data.error);
+                            }
+                        } catch (error) {
+                            console.error('Recommendations API error:', error);
+                            showMessage('Network error. Could not connect to backend. Is it running?', 'error');
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    };
+
+                    fetchRecommendations();
+                }, [userId]); // Re-fetch if userId changes
+
+                return (
+                    <div className="min-h-screen bg-gray-100 p-4">
+                        <div className="max-w-4xl mx-auto py-8">
+                            <h2 className="text-4xl font-extrabold text-center text-gray-900 mb-8">Your Career Recommendations</h2>
+                            
+                            {isLoading && (
+                                <div className="flex justify-center items-center py-8">
+                                    <div className="loader mr-2"></div>
+                                    <p className="text-center text-gray-600 text-lg">Loading recommendations...</p>
+                                </div>
+                            )}
+                            {/* Display message if no recommendations are found after loading */}
+                            {recommendations.length === 0 && !isLoading && (
+                                <p className="text-center text-gray-600 text-lg">No recommendations found. Please complete the assessment or check backend data.</p>
+                            )}
+
+                            {/* Diagnostic: Display raw recommendations data - THIS IS CRUCIAL FOR DEBUGGING */}
+                            {!isLoading && recommendations.length > 0 && (
+                                <div className="p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-md mb-6">
+                                    <p className="font-bold">Diagnostic: Raw Recommendations Data (for debugging)</p>
+                                    <pre className="text-xs overflow-auto">{JSON.stringify(recommendations, null, 2)}</pre>
+                                </div>
+                            )}
+
+                            {/* Simplified rendering for initial debug - if this doesn't show, something is fundamentally wrong with state or re-render */}
+                            {!isLoading && recommendations.length > 0 && (
+                                <div className="p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded-md mb-6">
+                                    <p className="font-bold">Diagnostic: Simple List (should always show if data is present)</p>
+                                    <ul>
+                                        {recommendations.map((rec) => (
+                                            <li key={rec.id || Math.random()}>{rec.name || 'Unnamed Recommendation'} (Score: {rec.score !== undefined ? rec.score : 'N/A'})</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Actual styled grid rendering */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {recommendations.map((rec) => (
+                                    <div key={rec.id || Math.random()} className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500 hover:shadow-lg transition-shadow duration-300">
+                                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{rec.name || 'No Name'} (ID: {rec.id || 'N/A'})</h3>
+                                        <p className="text-gray-600 text-sm mb-3">{rec.description || 'No description available.'}</p>
+                                        
+                                        {Array.isArray(rec.skills_needed) && rec.skills_needed.length > 0 ? (
+                                            <div className="mb-3">
+                                                <span className="text-sm font-medium text-gray-700">Skills Needed:</span>
+                                                <ul className="list-disc list-inside text-sm text-gray-600">
+                                                    {rec.skills_needed.map((skill, index) => (
+                                                        <li key={index}>{skill}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-600 text-sm mb-3">No specific skills listed.</p>
+                                        )}
+
+                                        {rec.average_salary_usd && (
+                                            <p className="text-gray-700 text-sm font-medium">
+                                                Avg. Salary: <span className="text-green-700 font-bold">${rec.average_salary_usd.toLocaleString()}</span>
+                                            </p>
+                                        )}
+                                        {rec.score !== undefined && (
+                                            <p className="text-gray-500 text-xs mt-2">(Relevance Score: {rec.score})</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-10 text-center space-x-4">
+                                <button
+                                    onClick={() => setCurrentPage('assessment')}
+                                    className="py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition duration-150 shadow-md"
+                                >
+                                    Retake Assessment
+                                </button>
+                                <button
+                                    onClick={() => { setUserId(null); setCurrentPage('login'); showMessage('Logged out.', 'info'); }}
+                                    className="py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition duration-150 shadow-md"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Conditional Rendering based on currentPage state ---
+            const renderPage = () => {
+                switch (currentPage) {
+                    case 'register':
+                        return <RegisterPage />;
+                    case 'login':
+                        return <LoginPage />;
+                    case 'assessment':
+                        // Only allow assessment if user is logged in
+                        return userId ? <AssessmentPage /> : <LoginPage />;
+                    case 'recommendations':
+                        return <RecommendationsPage />;
+                    default:
+                        return <LoginPage />;
+                }
+            };
+
+            return (
+                <div className="font-sans antialiased text-gray-900 bg-gray-100">
+                    {renderPage()}
+                    {message.text && (
+                        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white z-50`}>
+                            {message.text}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Render the App component into the root div
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

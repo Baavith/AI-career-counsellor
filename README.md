@@ -50,9 +50,6 @@ python app.py
 └── AI_Career_Counsellor_Summary.docx  # Project report
 ```
 
-## 📸 Screenshots
-*Add your UI screenshots here*
-
 ## 🤝 Contributing
 Feel free to fork this repo, file issues, or suggest improvements!
 
